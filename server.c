@@ -11,6 +11,7 @@
 #include <err.h>
 
 #define MAX_CLIENTS 10
+#define BUFFER_SIZE 2048
 #define NAME_LEN 32
 
 
@@ -23,6 +24,8 @@ typedef struct{
 } client_t;
 
 client_t *clients[MAX_CLIENTS];
+int usersOnline = 0;
+
 
 
 char* str_ip_addr(char *str, struct sockaddr_in addr){
@@ -34,30 +37,60 @@ char* str_ip_addr(char *str, struct sockaddr_in addr){
 }
 
 void send_msg(char *msg, int uid){
-	
 	for(int i = 0; i < MAX_CLIENTS; i++){
 		if(clients[i] && clients[i]->uid != uid){
-			send(client->socket, msg, strlen(message), 0); 
+			write(clients[i]->socket, msg, strlen(msg)); 
 		}
 	}
 
 }
 
-void* client_handler(void *client){
-		usersOnline++;
-		// Client name
-		char name[32];
-		send(socketClient, "Enter your name: ", sizeof("Enter your name: "), 0);
-		recv(socketClient, &name, sizeof(name), 0);
-		strcpy(client->name, name);
-		char strIP[16];
-		printf("%s(%s)(%d) join the chatroom.\n", client->name, str_ip_addr(strIP, addrClient), socketClient);
+void queue_add(client_t *client){
+	for(int i = 0; i < MAX_CLIENTS; i++){
+		if(!clients[i]){
+			clients[i] = client;
+			break;
+		}
+	}
+}
 
+void queue_remove(int uid){
+	for(int i = 0; i < MAX_CLIENTS; i++){
+		if(clients[i]->uid == uid){
+			clients[i] = NULL;
+			break;
+		}
+	}
+}
+
+void* client_handler(void *arg){
+	usersOnline++;
+	client_t *client = (client_t *)arg;
+	// Client name
+	char name[32];
+	send(client->socket, "Enter your name: ", sizeof("Enter your name: "), 0);
+	recv(client->socket, &name, sizeof(name), 0);
+	strcpy(client->name, name);
+	char strIP[16];
+	printf("%s(%s)(%d) join the chatroom.\n", client->name, str_ip_addr(strIP, client->address), client->socket);
+
+	char buffer[BUFFER_SIZE];
 	while(1){
-		
+		int recvState = recv(client->socket, buffer, BUFFER_SIZE, 0);
+		if(recvState > 0){
+			//printf("%s", buffer);
+			send_msg(buffer, client->uid);
+		}
+		else{
+			break;
+		}
 	}
 
-	// close Client socket
+	sprintf(buffer, "%s has left.\n", client->name);
+	printf("%s",buffer);
+	send_msg(buffer, client->uid);
+	// Close client socket
+	queue_remove(client->uid);
 	close(client->socket);
 	free(client);
 	usersOnline--;
@@ -90,8 +123,8 @@ int main(){
 
 
 	pthread_t thread;
-	int usersOnline = 0;
 	printf("=== CHATROOM INITIATED ===\n");
+	int uid = 0;
 
 	while(1){
 		struct sockaddr_in addrClient;
@@ -109,9 +142,10 @@ int main(){
 		client_t *client = malloc(sizeof(client_t));
 		client->address = addrClient;
 		client->socket = socketClient;
-		client->uid = 1000;
+		client->uid = uid++;
 
 
+		queue_add(client);
 		pthread_create(&thread, NULL, client_handler, client);
 		
 		// Reduce CPU usage
