@@ -42,7 +42,6 @@ void send_msg(char *msg, int uid){
 			write(clients[i]->socket, msg, strlen(msg)); 
 		}
 	}
-
 }
 
 void queue_add(client_t *client){
@@ -56,7 +55,7 @@ void queue_add(client_t *client){
 
 void queue_remove(int uid){
 	for(int i = 0; i < MAX_CLIENTS; i++){
-		if(clients[i]->uid == uid){
+		if(clients[i] && clients[i]->uid == uid){
 			clients[i] = NULL;
 			break;
 		}
@@ -72,7 +71,7 @@ void* client_handler(void *arg){
 	recv(client->socket, &name, sizeof(name), 0);
 	strcpy(client->name, name);
 	char strIP[16];
-	printf("%s(%s)(%d) join the chatroom.\n", client->name, str_ip_addr(strIP, client->address), client->socket);
+	printf("%s(%s)(%d)(%d) join the chatroom.\n", client->name, str_ip_addr(strIP, client->address), client->socket, client->uid);
 
 	char buffer[BUFFER_SIZE];
 	while(1){
@@ -95,7 +94,7 @@ void* client_handler(void *arg){
 	free(client);
 	usersOnline--;
 
-	pthread_exit(NULL);
+//	pthread_exit(NULL);
 }
 
 int main(){
