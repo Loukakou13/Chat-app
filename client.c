@@ -47,9 +47,22 @@ void *send_msg_handler(){
 
 void *recv_msg_handler(){
 	char msg[LENGTH];
+	int c;
+	int recvState;
 	while(1){
-		recv(socketServer, msg, LENGTH, 0);
-		printf("%s", msg);
+		recvState = recv(socketServer, msg, LENGTH, 0);
+		if(recvState > 0){
+			printf("CA VA MARCHER ?\n");
+			printf("\33[2k\r");
+//			fflush(stdin);
+			while((c = getchar()) != '\n' && c != EOF){};
+			printf("%s", msg);
+			bzero(&msg, sizeof(msg));
+		}
+		else{
+			flag = 1;
+			break;
+		}
 	}
 	pthread_exit(NULL);
 }

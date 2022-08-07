@@ -10,9 +10,17 @@
 #include <pthread.h>
 #include <err.h>
 
-#define MAX_CLIENTS 10
-#define BUFFER_SIZE 2048
-#define NAME_LEN 32
+#define ANSI_COLOR_YELLOW 	 "\x1b[33m"
+#define ANSI_COLOR_RED    	 "\x1b[31m"
+#define ANSI_COLOR_GREEN 	 "\x1b[32m"
+#define ANSI_COLOR_MAGENTA 	 "\x1b[35m"
+#define ANSI_COLOR_CANCEL	 "\x1b[0m"
+
+
+
+#define MAX_CLIENTS  	10
+#define BUFFER_SIZE		2048
+#define NAME_LEN  		32
 
 
 // Client Strucutre
@@ -25,6 +33,9 @@ typedef struct{
 
 client_t *clients[MAX_CLIENTS];
 int usersOnline = 0;
+
+
+
 
 
 
@@ -65,20 +76,28 @@ void queue_remove(int uid){
 void* client_handler(void *arg){
 	usersOnline++;
 	client_t *client = (client_t *)arg;
-	// Client name
-	char name[32];
-	send(client->socket, "Enter your name: ", sizeof("Enter your name: "), 0);
-	recv(client->socket, &name, sizeof(name), 0);
-	strcpy(client->name, name);
-	char strIP[16];
-	printf("%s(%s)(%d)(%d) join the chatroom.\n", client->name, str_ip_addr(strIP, client->address), client->socket, client->uid);
-
 	char buffer[BUFFER_SIZE];
+	// Client name
+	send(client->socket, "Enter your name: ", sizeof("Enter your name: "), 0);
+	if(recv(client->socket, &buffer, sizeof(buffer), 0) <= 0){
+		printf("connection cancelled.\n");
+		pthread_exit(NULL);
+	}
+	queue_add(client);
+	strcpy(client->name, buffer);
+	printf("%s(%s)(%d)(%d) join the chatroom.\n", client->name, str_ip_addr(buffer, client->address), client->socket, client->uid);
+	sprintf(buffer, ANSI_COLOR_GREEN "%s joined the chatroom.\n" ANSI_COLOR_CANCEL, client->name);
+	send_msg(buffer, client->uid);
+	bzero(&buffer, sizeof(buffer));
+
+
+	int recvState;
 	while(1){
-		int recvState = recv(client->socket, buffer, BUFFER_SIZE, 0);
+		recvState = recv(client->socket, buffer, BUFFER_SIZE, 0);
 		if(recvState > 0){
 			//printf("%s", buffer);
 			send_msg(buffer, client->uid);
+			bzero(&buffer, sizeof(buffer));
 		}
 		else{
 			break;
@@ -94,7 +113,7 @@ void* client_handler(void *arg){
 	free(client);
 	usersOnline--;
 
-//	pthread_exit(NULL);
+	pthread_exit(NULL);
 }
 
 int main(){
@@ -144,7 +163,6 @@ int main(){
 		client->uid = uid++;
 
 
-		queue_add(client);
 		pthread_create(&thread, NULL, client_handler, client);
 		
 		// Reduce CPU usage
